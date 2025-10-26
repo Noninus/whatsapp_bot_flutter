@@ -1,0 +1,22 @@
+name: whatsapp_bot_platform_interface
+description: Whatsapp bot platform interface
+version: 2.0.1
+homepage: https://github.com/rohitsangwan01/whatsapp_bot_flutter
+repository: https://github.com/rohitsangwan01/whatsapp_bot_flutter
+issue_tracker: https://github.com/rohitsangwan01/whatsapp_bot_flutter/issues
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+
+dependencies:
+  freezed_annotation: ^2.4.4
+  http: ^1.2.1
+  json_annotation: ^4.9.0
+  mime: ^1.0.5
+  zxing2: ^0.2.3
+
+dev_dependencies:
+  build_runner: ^2.4.11
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+  lints: ^2.0.1
