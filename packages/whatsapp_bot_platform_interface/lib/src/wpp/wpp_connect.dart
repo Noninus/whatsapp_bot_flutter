@@ -12,7 +12,8 @@ class WppConnect {
     String? wppJsContent,
     required Duration waitTimeOut,
   }) async {
-    String primaryUrl = "http://sagresinformatica.com.br/downloads/wppconnect-wa.js";
+    String primaryUrl =
+        "https://github.com/Noninus/whatsapp_bot_flutter/releases/latest/download/wppconnect-wa.js";
     String fallbackUrl =
         "https://github.com/wppconnect-team/wa-js/releases/latest/download/wppconnect-wa.js";
 
@@ -22,19 +23,22 @@ class WppConnect {
     } else {
       // Tenta primeiro do servidor válido
       try {
-        WhatsappLogger.log("Tentando baixar wppconnect-wa.js do servidor primário...");
+        WhatsappLogger.log(
+            "Tentando baixar wppconnect-wa.js do servidor primário...");
         content = await http.read(Uri.parse(primaryUrl));
         WhatsappLogger.log("Download do servidor primário bem-sucedido!");
       } catch (e) {
         // Se falhar, tenta do GitHub como fallback
-        WhatsappLogger.log("Falha no servidor primário, tentando fallback do GitHub...");
+        WhatsappLogger.log(
+            "Falha no servidor primário, tentando fallback do GitHub...");
         try {
           content = await http.read(Uri.parse(fallbackUrl));
           WhatsappLogger.log("Download do fallback bem-sucedido!");
         } catch (fallbackError) {
           throw WhatsappException(
             exceptionType: WhatsappExceptionType.failedToConnect,
-            message: "Falha ao baixar wppconnect-wa.js de ambas as fontes: $e | $fallbackError",
+            message:
+                "Falha ao baixar wppconnect-wa.js de ambas as fontes: $e | $fallbackError",
           );
         }
       }
