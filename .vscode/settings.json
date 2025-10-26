@@ -12,5 +12,6 @@
     "typeof",
     "wpclient",
     "zxing"
-  ]
+  ],
+  "dart.flutterSdkPath": ".fvm/flutter_sdk"
 }
