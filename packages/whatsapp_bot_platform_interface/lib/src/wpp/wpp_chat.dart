@@ -358,4 +358,244 @@ class WppChat {
           });''',
         methodName: "forwardMessage");
   }
+
+  // ==================== NOVOS MÉTODOS PARA LID ==================== //
+
+  /// Request the real phone number for a LID chat (@lid format)
+  /// This method uses WPP.chat.requestPhoneNumber to get the actual phone number
+  Future<String?> requestPhoneNumber({required String lidJid}) async {
+    try {
+      var result = await wpClient.evaluateJs(
+        '''WPP.chat.requestPhoneNumber(${lidJid.jsParse});''',
+        methodName: "requestPhoneNumber",
+      );
+
+      // O resultado pode vir em diferentes formatos dependendo da versão do wa-js
+      if (result != null) {
+        // Se for string, retorna diretamente
+        if (result is String) return result;
+
+        // Se for Map, tenta extrair o campo 'to' ou 'phone'
+        if (result is Map) {
+          return result['to']?.toString() ?? result['phone']?.toString();
+        }
+      }
+    } catch (e) {
+      WhatsappLogger.log("Erro ao requisitar número de telefone: $e");
+    }
+    return null;
+  }
+
+  /// Get phone number from LID using multiple wa-js methods
+  /// This is a more robust approach that tries different ways to resolve @lid to phone number
+  Future<String?> resolvePhoneFromLid({required String lidJid}) async {
+    try {
+      var result = await wpClient.evaluateJs(
+        '''
+        (async function() {
+          try {
+            const jid = ${lidJid.jsParse};
+            
+            // Método 1: Tentar obter informações do contato
+            try {
+              const contact = await WPP.contact.get(jid);
+              if (contact && contact.id && contact.id._serialized) {
+                return contact.id._serialized;
+              }
+            } catch (e) {
+              console.log("Método 1 falhou:", e);
+            }
+            
+            // Método 2: Usar WPP.contact.getPhoneNumber se disponível
+            try {
+              if (WPP.contact.getPhoneNumber) {
+                const phoneNumber = await WPP.contact.getPhoneNumber(jid);
+                if (phoneNumber) {
+                  return phoneNumber;
+                }
+              }
+            } catch (e) {
+              console.log("Método 2 falhou:", e);
+            }
+            
+            // Método 3: Usar requestPhoneNumber
+            try {
+              const result = await WPP.chat.requestPhoneNumber(jid);
+              if (result && result.to) {
+                return result.to;
+              }
+              return result;
+            } catch (e) {
+              console.log("Método 3 falhou:", e);
+            }
+            
+            // Método 4: Tentar buscar na lista de contatos
+            try {
+              const contacts = await WPP.contact.list();
+              const foundContact = contacts.find(contact => 
+                contact.id && contact.id._serialized === jid
+              );
+              if (foundContact && foundContact.formattedName) {
+                return foundContact.id._serialized;
+              }
+            } catch (e) {
+              console.log("Método 4 falhou:", e);
+            }
+            
+            return null;
+          } catch (error) {
+            console.log("Erro geral ao resolver LID:", error);
+            return null;
+          }
+        })();
+        ''',
+        methodName: "resolvePhoneFromLid",
+      );
+
+      return result?.toString();
+    } catch (e) {
+      WhatsappLogger.log("Erro ao resolver telefone do LID: $e");
+    }
+    return null;
+  }
+
+  /// Extract phone number from any JID format (@c.us or @lid)
+  /// For @c.us: extracts directly
+  /// For @lid: uses wa-js methods to resolve to phone number
+  Future<String?> extractPhoneNumber({required String jid}) async {
+    try {
+      if (jid.contains('@c.us')) {
+        // Formato antigo - extrair diretamente
+        return jid.split('@')[0];
+      }
+
+      if (jid.contains('@lid')) {
+        // Formato novo - usar wa-js para resolver
+        return await resolvePhoneFromLid(lidJid: jid);
+      }
+
+      // Se não tem @ no final, pode ser só o número
+      if (!jid.contains('@')) {
+        return jid;
+      }
+    } catch (e) {
+      WhatsappLogger.log("Erro ao extrair número de telefone: $e");
+    }
+    return null;
+  }
+
+  /// Check if a JID is in LID format (@lid)
+  bool isLidFormat({required String jid}) {
+    return jid.contains('@lid');
+  }
+
+  /// Check if a JID is in classic format (@c.us)
+  bool isClassicFormat({required String jid}) {
+    return jid.contains('@c.us');
+  }
+
+  /// Get contact information including phone mapping for LID
+  Future<Map<String, dynamic>?> getContactInfo({required String jid}) async {
+    try {
+      var result = await wpClient.evaluateJs(
+        '''
+        (async function() {
+          try {
+            const jid = ${jid.jsParse};
+            const contact = await WPP.contact.get(jid);
+            
+            if (contact) {
+              return {
+                id: contact.id ? contact.id._serialized : null,
+                name: contact.name || contact.formattedName || null,
+                pushname: contact.pushname || null,
+                isMyContact: contact.isMyContact || false,
+                isWAContact: contact.isWAContact || false,
+                originalJid: jid
+              };
+            }
+            return null;
+          } catch (error) {
+            console.log("Erro ao obter informações do contato:", error);
+            return null;
+          }
+        })();
+        ''',
+        methodName: "getContactInfo",
+        forceJsonParseResult: true,
+      );
+
+      if (result is Map<String, dynamic>) {
+        return result;
+      }
+    } catch (e) {
+      WhatsappLogger.log("Erro ao obter informações do contato: $e");
+    }
+    return null;
+  }
+
+  /// Batch resolve multiple JIDs to phone numbers (useful for optimization)
+  Future<Map<String, String?>> batchResolvePhoneNumbers({
+    required List<String> jids,
+  }) async {
+    Map<String, String?> results = {};
+
+    try {
+      var result = await wpClient.evaluateJs(
+        '''
+        (async function() {
+          const jids = ${jsonEncode(jids)};
+          const results = {};
+          
+          for (const jid of jids) {
+            try {
+              if (jid.includes('@c.us')) {
+                // Formato antigo - extrair diretamente
+                results[jid] = jid.split('@')[0];
+              } else if (jid.includes('@lid')) {
+                // Tentar resolver LID
+                try {
+                  const contact = await WPP.contact.get(jid);
+                  if (contact && contact.id && contact.id._serialized) {
+                    results[jid] = contact.id._serialized;
+                    continue;
+                  }
+                } catch (e) {}
+                
+                try {
+                  const result = await WPP.chat.requestPhoneNumber(jid);
+                  if (result && result.to) {
+                    results[jid] = result.to;
+                    continue;
+                  }
+                } catch (e) {}
+                
+                results[jid] = null;
+              } else {
+                results[jid] = jid.includes('@') ? null : jid;
+              }
+            } catch (error) {
+              console.log("Erro ao processar JID:", jid, error);
+              results[jid] = null;
+            }
+          }
+          
+          return results;
+        })();
+        ''',
+        methodName: "batchResolvePhoneNumbers",
+        forceJsonParseResult: true,
+      );
+
+      if (result is Map) {
+        result.forEach((key, value) {
+          results[key.toString()] = value?.toString();
+        });
+      }
+    } catch (e) {
+      WhatsappLogger.log("Erro ao resolver JIDs em lote: $e");
+    }
+
+    return results;
+  }
 }
