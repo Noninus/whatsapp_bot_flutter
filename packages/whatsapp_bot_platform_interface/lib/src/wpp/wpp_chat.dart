@@ -361,9 +361,21 @@ class WppChat {
 
   /// Converts a LID to JID (phone number format)
   Future<String?> lidToJid(String lid) async {
-    return await wpClient.evaluateJs(
-      '''WPP.whatsapp.functions.getPhoneNumber('$lid')._serialized;''',
-      methodName: "lidToJid",
-    );
+    try {
+      final result = await wpClient.evaluateJs(
+        '''
+      (function() {
+        const wid = WPP.whatsapp.WidFactory.createWid('$lid');
+        const phoneWid = WPP.whatsapp.functions.getPhoneNumber(wid);
+        return phoneWid._serialized;
+      })();
+      ''',
+        methodName: "lidToJid",
+      );
+      return result?.toString();
+    } catch (e) {
+      print('Error converting LID to JID: $e');
+      return null;
+    }
   }
 }
