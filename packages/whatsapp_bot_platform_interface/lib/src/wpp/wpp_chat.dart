@@ -365,9 +365,30 @@ class WppChat {
       final result = await wpClient.evaluateJs(
         '''
       (async function() {
-        const wid = WPP.whatsapp.WidFactory.createWid('$lid');
-        const phoneWid = await WPP.whatsapp.functions.getPhoneNumber(wid);
-        return phoneWid._serialized;
+        try {
+          const lidWid = WPP.whatsapp.WidFactory.createWid('$lid');
+          
+          // Busca o contato no store
+          const contact = WPP.whatsapp.ContactStore.get(lidWid);
+          
+          if (contact && contact.phoneNumber) {
+            return contact.phoneNumber._serialized;
+          }
+          
+          // Se não encontrou, tenta fazer query
+          await WPP.contact.queryExists('$lid');
+          
+          // Tenta novamente após query
+          const updatedContact = WPP.whatsapp.ContactStore.get(lidWid);
+          if (updatedContact && updatedContact.phoneNumber) {
+            return updatedContact.phoneNumber._serialized;
+          }
+          
+          return null;
+        } catch (e) {
+          console.error('Error in lidToJid:', e);
+          return null;
+        }
       })();
       ''',
         methodName: "lidToJid",
@@ -376,6 +397,83 @@ class WppChat {
     } catch (e) {
       print('Error converting LID to JID: $e');
       return null;
+    }
+  }
+
+  /// Converts a LID to JID using WPP.contact API
+  Future<String?> lidToJid2(String lid) async {
+    try {
+      final result = await wpClient.evaluateJs(
+        '''
+      (async function() {
+        try {
+          // Usa a API de alto nível para buscar o contato
+          const contact = await WPP.contact.get('$lid');
+          
+          if (!contact) {
+            return null;
+          }
+          
+          // Se tem phoneNumber, retorna
+          if (contact.phoneNumber) {
+            return contact.phoneNumber;
+          }
+          
+          // Se o próprio id não é LID, retorna ele
+          if (contact.id && !contact.id._serialized.includes('@lid')) {
+            return contact.id._serialized;
+          }
+          
+          return null;
+        } catch (e) {
+          console.error('Error in lidToJid:', e);
+          return null;
+        }
+      })();
+      ''',
+        methodName: "lidToJid",
+      );
+      return result?.toString();
+    } catch (e) {
+      print('Error converting LID to JID: $e');
+      return null;
+    }
+  }
+
+  /// Debug function to see what's available
+  Future<void> debugLid(String lid) async {
+    try {
+      final result = await wpClient.evaluateJs(
+        '''
+      (async function() {
+        try {
+          const lidWid = WPP.whatsapp.WidFactory.createWid('$lid');
+          const contact = WPP.whatsapp.ContactStore.get(lidWid);
+          
+          console.log('LID Wid:', lidWid);
+          console.log('Contact:', contact);
+          console.log('Contact keys:', contact ? Object.keys(contact) : 'null');
+          console.log('phoneNumber:', contact?.phoneNumber);
+          console.log('id:', contact?.id);
+          
+          return {
+            hasContact: !!contact,
+            hasPhoneNumber: !!contact?.phoneNumber,
+            phoneNumber: contact?.phoneNumber?._serialized,
+            id: contact?.id?._serialized,
+            allKeys: contact ? Object.keys(contact).join(', ') : 'no contact'
+          };
+        } catch (e) {
+          console.error('Error:', e);
+          return { error: e.toString() };
+        }
+      })();
+      ''',
+        methodName: "debugLid",
+      );
+      print('Debug result: $result');
+    } catch (e) {
+      print('Debug error: $e');
     }
   }
 }
