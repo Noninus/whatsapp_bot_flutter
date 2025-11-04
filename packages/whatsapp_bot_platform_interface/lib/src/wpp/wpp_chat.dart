@@ -364,9 +364,9 @@ class WppChat {
     try {
       final result = await wpClient.evaluateJs(
         '''
-      (function() {
+      (async function() {
         const wid = WPP.whatsapp.WidFactory.createWid('$lid');
-        const phoneWid = WPP.whatsapp.functions.getPhoneNumber(wid);
+        const phoneWid = await WPP.whatsapp.functions.getPhoneNumber(wid);
         return phoneWid._serialized;
       })();
       ''',
