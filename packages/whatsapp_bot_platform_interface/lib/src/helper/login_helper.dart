@@ -67,7 +67,7 @@ Future waitForLogin(
     WhatsappLogger.log('Checking phone is connected...');
 
     onConnectionEvent?.call(ConnectionEvent.connecting);
-    bool inChat = await _waitForInChat(wpClient);
+    bool inChat = await _waitForInChat(wpClient, waitDurationSeconds);
     if (!inChat) {
       WhatsappLogger.log('Phone not connected');
       throw 'Phone not connected';
@@ -80,7 +80,7 @@ Future waitForLogin(
     WhatsappLogger.log('Checking phone is connected...');
 
     onConnectionEvent?.call(ConnectionEvent.connecting);
-    bool inChat = await _waitForInChat(wpClient);
+    bool inChat = await _waitForInChat(wpClient, waitDurationSeconds);
     if (!inChat) {
       WhatsappLogger.log('Phone not connected');
       throw 'Phone not connected';
@@ -90,14 +90,14 @@ Future waitForLogin(
   }
 }
 
-Future<bool> _waitForInChat(WpClientInterface wpClient) async {
+Future<bool> _waitForInChat(WpClientInterface wpClient, int waitDurationSeconds) async {
   var inChat = await WppAuth(wpClient).isMainReady();
   if (inChat) return true;
   Completer<bool> completer = Completer();
   late Timer timer;
   WppAuth wppAuth = WppAuth(wpClient);
   timer = Timer.periodic(const Duration(milliseconds: 1000), (tim) async {
-    if (tim.tick > 60) {
+    if (tim.tick > waitDurationSeconds) {
       timer.cancel();
       if (!completer.isCompleted) completer.complete(false);
     } else {
