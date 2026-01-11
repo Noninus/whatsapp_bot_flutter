@@ -282,8 +282,11 @@ class WppChat {
     bool deleteMediaInDevice = false,
     bool revoke = false,
   }) async {
+    // Se o phone já contém @lid ou @c.us, usa direto sem converter
+    String phoneParsed = phone.contains('@') ? phone.jsParse : phone.phoneParse;
+
     return await wpClient.evaluateJs(
-      '''WPP.chat.deleteMessage(${phone.phoneParse},${messageId.jsParse}, $deleteMediaInDevice, $revoke);''',
+      '''WPP.chat.deleteMessage($phoneParsed,${messageId.jsParse}, $deleteMediaInDevice, $revoke);''',
       methodName: "deleteMessage",
     );
   }
