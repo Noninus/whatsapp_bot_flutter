@@ -282,7 +282,7 @@ class WppChat {
     bool deleteMediaInDevice = false,
     bool revoke = false,
   }) async {
-    // Se o phone já contém @lid ou @c.us, usa direto sem converter
+    // Se já contém @ (é @lid ou @c.us), usa jsParse direto sem parsePhone
     String phoneParsed = phone.contains('@') ? phone.jsParse : phone.phoneParse;
 
     return await wpClient.evaluateJs(
